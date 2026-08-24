@@ -24,7 +24,7 @@ export default class {
     this.onNavigate(ROUTES_PATH["NewBill"]);
   };
 
-  handleClickIco+ = (icon) => {
+  handleClickIco = (icon) => {
     const billUrl = icon.getAttribute("data-bill-url");
     const imgWidth = Math.floor($("#modaleFile").width() * 0.5);
     $("#modaleFile")
