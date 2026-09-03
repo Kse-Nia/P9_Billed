@@ -102,6 +102,6 @@ mot de passe : admin
 ```
 ### employé :
 ```
-utilisateur : employee@company.tld /// Not working with "company" but "test"
+utilisateur : employee@company.tld
 mot de passe : employee
 ```
