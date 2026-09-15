@@ -9,8 +9,6 @@ import router from "../app/Router.js";
 
 jest.mock("../app/Store.js", () => mockStore);
 
-// --- Helpers ---------------------------------------------------------------
-
 // User employee connect and storage to LS
 const connectAsEmployee = () => {
   Object.defineProperty(window, "localStorage", { value: localStorageMock });
