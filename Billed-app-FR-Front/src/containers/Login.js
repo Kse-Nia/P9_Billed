@@ -24,6 +24,8 @@ export default class Login {
     );
     formAdmin.addEventListener("submit", this.handleSubmitAdmin);
   }
+
+  /////// Fix error login employee - employee email instead admin ///////
   handleSubmitEmployee = (e) => {
     e.preventDefault();
     const user = {
