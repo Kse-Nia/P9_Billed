@@ -4,8 +4,14 @@
 
 import LoginUI from "../views/LoginUI";
 import Login from "../containers/Login.js";
-import { ROUTES } from "../constants/routes";
-import { fireEvent, screen } from "@testing-library/dom";
+import { ROUTES, ROUTES_PATH } from "../constants/routes";
+import { fireEvent, screen, waitFor } from "@testing-library/dom";
+
+// localStorage minimal, avec jest.fn() pour espionner les écritures
+const fakeLocalStorage = () => ({
+  getItem: jest.fn(() => null),
+  setItem: jest.fn(),
+});
 
 describe("Given that I am a user on login page", () => {
   describe("When I do not fill fields and I click on employee button Login In", () => {
@@ -225,6 +231,177 @@ describe("Given that I am a user on login page", () => {
 
     test("It should renders HR dashboard page", () => {
       expect(screen.queryByText("Validations")).toBeTruthy();
+    });
+  });
+});
+
+describe("Given that I am a user whose account does not exist yet", () => {
+  describe("When I submit the employee form with correct credentials", () => {
+    test("Then handleSubmitEmployee should create my account before navigating to Bills", async () => {
+      document.body.innerHTML = LoginUI();
+      fireEvent.change(screen.getByTestId("employee-email-input"), {
+        target: { value: "newemployee@email.com" },
+      });
+      fireEvent.change(screen.getByTestId("employee-password-input"), {
+        target: { value: "azerty" },
+      });
+
+      Object.defineProperty(window, "localStorage", {
+        value: fakeLocalStorage(),
+        writable: true,
+      });
+      const onNavigate = jest.fn();
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate,
+        PREVIOUS_LOCATION: "",
+        store: jest.fn(),
+      });
+      // Le compte n'existe pas encore : login() échoue, ce qui doit déclencher createUser()
+      login.login = jest.fn().mockRejectedValue(new Error("account not found"));
+      login.createUser = jest.fn().mockResolvedValue({});
+
+      fireEvent.submit(screen.getByTestId("form-employee"));
+
+      await waitFor(() => expect(login.createUser).toHaveBeenCalled());
+      expect(onNavigate).toHaveBeenCalledWith(ROUTES_PATH["Bills"]);
+    });
+  });
+
+  describe("When I submit the admin form with correct credentials", () => {
+    test("Then handleSubmitAdmin should create my account before navigating to Dashboard", async () => {
+      document.body.innerHTML = LoginUI();
+      fireEvent.change(screen.getByTestId("admin-email-input"), {
+        target: { value: "newadmin@email.com" },
+      });
+      fireEvent.change(screen.getByTestId("admin-password-input"), {
+        target: { value: "azerty" },
+      });
+
+      Object.defineProperty(window, "localStorage", {
+        value: fakeLocalStorage(),
+        writable: true,
+      });
+      const onNavigate = jest.fn();
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate,
+        PREVIOUS_LOCATION: "",
+        store: jest.fn(),
+      });
+      login.login = jest.fn().mockRejectedValue(new Error("account not found"));
+      login.createUser = jest.fn().mockResolvedValue({});
+
+      fireEvent.submit(screen.getByTestId("form-admin"));
+
+      await waitFor(() => expect(login.createUser).toHaveBeenCalled());
+      expect(onNavigate).toHaveBeenCalledWith(ROUTES_PATH["Dashboard"]);
+    });
+  });
+});
+
+describe("Given the Login container is used with a real store", () => {
+  describe("When I call login with a store", () => {
+    test("Then it should post the credentials and store the returned jwt", async () => {
+      Object.defineProperty(window, "localStorage", {
+        value: fakeLocalStorage(),
+        writable: true,
+      });
+      document.body.innerHTML = LoginUI();
+      const store = { login: jest.fn().mockResolvedValue({ jwt: "abc-jwt-token" }) };
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate: jest.fn(),
+        PREVIOUS_LOCATION: "",
+        store,
+      });
+
+      await login.login({ email: "a@a", password: "azerty" });
+
+      expect(store.login).toHaveBeenCalledWith(
+        JSON.stringify({ email: "a@a", password: "azerty" }),
+      );
+      expect(window.localStorage.setItem).toHaveBeenCalledWith(
+        "jwt",
+        "abc-jwt-token",
+      );
+    });
+  });
+
+  describe("When I call login without a store", () => {
+    test("Then it should return null", () => {
+      document.body.innerHTML = LoginUI();
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate: jest.fn(),
+        PREVIOUS_LOCATION: "",
+        store: null,
+      });
+
+      expect(login.login({ email: "a@a", password: "azerty" })).toBeNull();
+    });
+  });
+
+  describe("When I call createUser with a store", () => {
+    test("Then it should create the user in the store and log them in", async () => {
+      const consoleLog = jest.spyOn(console, "log").mockImplementation(() => {});
+      Object.defineProperty(window, "localStorage", {
+        value: fakeLocalStorage(),
+        writable: true,
+      });
+      document.body.innerHTML = LoginUI();
+      const create = jest.fn().mockResolvedValue({});
+      const store = {
+        users: () => ({ create }),
+        login: jest.fn().mockResolvedValue({ jwt: "new-jwt-token" }),
+      };
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate: jest.fn(),
+        PREVIOUS_LOCATION: "",
+        store,
+      });
+
+      await login.createUser({
+        type: "Employee",
+        email: "new.employee@email.com",
+        password: "azerty",
+      });
+
+      expect(create).toHaveBeenCalledWith({
+        data: JSON.stringify({
+          type: "Employee",
+          name: "new.employee",
+          email: "new.employee@email.com",
+          password: "azerty",
+        }),
+      });
+      expect(consoleLog).toHaveBeenCalledWith(
+        "User with new.employee@email.com is created",
+      );
+      expect(store.login).toHaveBeenCalled();
+    });
+  });
+
+  describe("When I call createUser without a store", () => {
+    test("Then it should return null", () => {
+      document.body.innerHTML = LoginUI();
+      const login = new Login({
+        document,
+        localStorage: window.localStorage,
+        onNavigate: jest.fn(),
+        PREVIOUS_LOCATION: "",
+        store: null,
+      });
+
+      expect(
+        login.createUser({ type: "Employee", email: "a@a", password: "x" }),
+      ).toBeNull();
     });
   });
 });
