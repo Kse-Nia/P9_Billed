@@ -14,6 +14,15 @@
       "!**/external/**",
       "!**/fixtures/**",
       "!**/lcov-report/**"
+    ],
+    "reporters": [
+      "default",
+      [
+        "jest-html-reporter",
+        {
+          "outputPath": "coverage/covreport/index.html"
+        }
+      ]
     ]
   },
   "type": "module",
